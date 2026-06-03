@@ -13,6 +13,7 @@ Hugging Face, then it's cached). Use a smaller model for speed, e.g.
 """
 from __future__ import annotations
 import argparse, re
+from datetime import date
 from pathlib import Path
 import yt_dlp
 import mlx_whisper
@@ -60,7 +61,8 @@ def main() -> None:
     res = mlx_whisper.transcribe(str(audio), **kw)
 
     OUT.mkdir(exist_ok=True)
-    base = OUT / f"{slug(title)}__{vid}"
+    # filename = generation date + video title + video id (e.g. 2026-06-03_Beyond_the_basics_..._tuY2ChJIx48)
+    base = OUT / f"{date.today().isoformat()}_{slug(title)}_{vid}"
     txt = base.with_suffix(".txt")
     txt.write_text(res["text"].strip() + "\n", encoding="utf-8")
     print(f"\n✅ transcript: {txt}", flush=True)
