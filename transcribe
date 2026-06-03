@@ -1,22 +1,31 @@
 #!/usr/bin/env bash
-# aegis-yt-transcriber — one-liner wrapper.
-#   ./transcribe "https://www.youtube.com/watch?v=VIDEO_ID" [--timestamps] [--model REPO] [--lang en]
-# First run bootstraps a local .venv from requirements.txt; later runs reuse it.
+# aegis-yt-transcriber — one-liner wrapper (macOS / Linux).
+#   ./transcribe "https://www.youtube.com/watch?v=VIDEO_ID" [--timestamps] [--model NAME] [--lang en]
+#
+# Prefers `uv` (https://docs.astral.sh/uv/) — it reads pyproject.toml and manages the
+# environment automatically. If uv is not installed, falls back to a plain venv + pip.
 set -euo pipefail
 
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-VENV="$DIR/.venv"
 
 if [ "$#" -eq 0 ]; then
-  echo "usage: ./transcribe \"<youtube-url>\" [--timestamps] [--model REPO] [--lang en]" >&2
+  echo "usage: ./transcribe \"<youtube-url>\" [--timestamps] [--model NAME] [--lang en]" >&2
   exit 2
 fi
 
+# Fast path: uv handles the env from pyproject.toml.
+if command -v uv >/dev/null 2>&1; then
+  exec uv run --quiet --project "$DIR" "$DIR/yt2txt.py" "$@"
+fi
+
+# Fallback: plain venv + pip (no uv on this machine).
+VENV="$DIR/.venv"
 if [ ! -x "$VENV/bin/python" ]; then
   echo ">> first run: creating .venv and installing deps (one-time)..." >&2
+  echo "   (tip: install uv for a faster setup — https://docs.astral.sh/uv/)" >&2
   python3 -m venv "$VENV"
   "$VENV/bin/python" -m pip install --quiet --upgrade pip
-  "$VENV/bin/python" -m pip install --quiet -r "$DIR/requirements.txt"
+  "$VENV/bin/python" -m pip install --quiet "$DIR"
 fi
 
 exec "$VENV/bin/python" "$DIR/yt2txt.py" "$@"

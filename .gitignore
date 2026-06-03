@@ -3,3 +3,4 @@ audio/
 transcripts/
 __pycache__/
 *.pyc
+.pytest_cache/

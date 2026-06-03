@@ -1,0 +1,24 @@
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    # Prove the pure logic runs identically on all three platforms.
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      # yt2txt keeps its heavy deps (yt-dlp / whisper) behind lazy imports, so the
+      # unit tests need only pytest — fast, no model downloads.
+      - run: python -m pip install --upgrade pip pytest
+      - run: pytest -q
