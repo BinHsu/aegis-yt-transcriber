@@ -4,10 +4,12 @@
 
 Turn a YouTube URL into a text transcript — **including videos that have captions disabled.**
 
-When a video has captions you don't need this (use YouTube's own *Show transcript*, or
-[`youtube-transcript-api`](https://pypi.org/project/youtube-transcript-api/)). This tool is
-for the case where captions are off: it downloads the audio and transcribes it **locally**
-with Whisper. No third-party transcription service — the audio never leaves your machine.
+**Captions-first.** By default the tool first tries to pull the video's existing captions
+(human-written, then auto-generated) via yt-dlp — that's seconds, no audio download, no model.
+**Only when a video has no usable captions — or they've been disabled — does it fall back** to
+downloading the audio and transcribing it **locally** with Whisper. No third-party transcription
+service; in the fallback path the audio never leaves your machine. Pass `--force-whisper` to skip
+the caption check and always transcribe (useful when auto-captions are low quality).
 
 Runs on **macOS, Linux, and Windows.** On Apple Silicon it uses the Metal-accelerated
 `mlx-whisper`; everywhere else it uses the cross-platform `faster-whisper`. The choice is
@@ -58,12 +60,16 @@ Apple-Silicon macOS and skips it everywhere else. Force a backend with `--backen
 ## Usage
 
 ```bash
-./transcribe "<url>"                 # plain transcript
-./transcribe "<url>" --timestamps    # also write a [mm:ss] segmented file
-./transcribe "<url>" --lang en       # force a language (default: auto-detect)
-./transcribe "<url>" --model small   # faster/lighter model
-./transcribe "<url>" --backend faster   # override auto-selection
+./transcribe "<url>"                  # captions if available, else Whisper
+./transcribe "<url>" --timestamps     # also write a [mm:ss] segmented file
+./transcribe "<url>" --force-whisper  # skip captions, always transcribe the audio
+./transcribe "<url>" --lang en        # force a language (default: auto-detect)
+./transcribe "<url>" --model small    # faster/lighter Whisper model
+./transcribe "<url>" --backend faster # override backend auto-selection
 ```
+
+The run prints which path it took — `✓ captions found … skipping Whisper`, or
+`no usable captions … falling back to audio + Whisper`.
 
 Default model per backend:
 
@@ -87,11 +93,16 @@ python3 -m venv .venv
 ## How it works
 
 ```
+captions? ── yes ─→ yt-dlp pulls the json3 caption track ───────────────→ text   (seconds)
+   │
+   no / disabled / --force-whisper
+   ↓
 yt-dlp (download best audio) → ffmpeg (extract mp3) → Whisper (mlx | faster) → text
 ```
 
-The transcription step is pluggable; only the Whisper backend differs by platform, the rest of
-the pipeline is identical everywhere.
+Captions come from the same `timedtext` track YouTube's own player uses (human-written
+preferred over auto-generated). The transcription fallback is pluggable; only the Whisper
+backend differs by platform, the rest of the pipeline is identical everywhere.
 
 ## Tests
 

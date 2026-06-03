@@ -217,3 +217,58 @@ def test_default_model_values_non_empty_strings(key):
     value = yt2txt.DEFAULT_MODEL[key]
     assert isinstance(value, str)
     assert value.strip() != ""
+
+
+# ---------------------------------------------------------------------------
+# parse_json3 — YouTube json3 caption parsing (pure)
+# ---------------------------------------------------------------------------
+
+def test_parse_json3_empty_dict_returns_empty_list():
+    assert yt2txt.parse_json3({}) == []
+
+
+def test_parse_json3_empty_events_returns_empty_list():
+    assert yt2txt.parse_json3({"events": []}) == []
+
+
+def test_parse_json3_event_without_segs_is_skipped():
+    # window/positioning events carry no "segs" -> no text -> dropped
+    assert yt2txt.parse_json3({"events": [{"tStartMs": 100}]}) == []
+
+
+def test_parse_json3_whitespace_only_text_is_skipped():
+    out = yt2txt.parse_json3({"events": [{"tStartMs": 0, "segs": [{"utf8": "  \n"}]}]})
+    assert out == []
+
+
+def test_parse_json3_none_seg_is_tolerated():
+    # YouTube occasionally emits a null seg; it must not crash, just be ignored
+    ev = {"tStartMs": 0, "segs": [None, {"utf8": "hi"}]}
+    assert yt2txt.parse_json3({"events": [ev]}) == [{"start": 0.0, "text": "hi"}]
+
+
+def test_parse_json3_single_event_text_and_start():
+    ev = {"tStartMs": 1500, "segs": [{"utf8": "hello"}]}
+    assert yt2txt.parse_json3({"events": [ev]}) == [{"start": 1.5, "text": "hello"}]
+
+
+def test_parse_json3_concatenates_multiple_segs_and_strips():
+    ev = {"tStartMs": 0, "segs": [{"utf8": "foo "}, {"utf8": "bar"}]}
+    assert yt2txt.parse_json3({"events": [ev]}) == [{"start": 0.0, "text": "foo bar"}]
+
+
+def test_parse_json3_missing_tstartms_defaults_to_zero():
+    out = yt2txt.parse_json3({"events": [{"segs": [{"utf8": "x"}]}]})
+    assert out == [{"start": 0.0, "text": "x"}]
+
+
+# BVA on the ms->seconds->[mm:ss] rollover, composed with fmt_timestamps.
+# Boundary B = 60_000 ms (60 s). Verify B-1 / B / B+1 render correct minutes.
+@pytest.mark.parametrize("ms,expected", [
+    (59_000, "[00:59]"),   # B-1
+    (60_000, "[01:00]"),   # B
+    (61_000, "[01:01]"),   # B+1
+])
+def test_parse_json3_then_fmt_timestamps_minute_rollover(ms, expected):
+    segs = yt2txt.parse_json3({"events": [{"tStartMs": ms, "segs": [{"utf8": "t"}]}]})
+    assert yt2txt.fmt_timestamps(segs).startswith(expected)
